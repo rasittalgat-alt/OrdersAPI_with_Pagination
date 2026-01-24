@@ -1,16 +1,7 @@
-# venv
 .venv/
-
-# python cache
 __pycache__/
 *.pyc
-
-# local DB
 orders.db
-
-# coverage
 .coverage
 htmlcov/
-
-# pytest cache (если появится)
 .pytest_cache/
