@@ -83,3 +83,49 @@ Run coverage locally and ensure at least 80%:
 coverage run -m pytest
 coverage report -m
 ```
+<!-- Copilot: add a "Filtering examples" section with 4-5 concise GET examples for status, amount range, date range, and combined with pagination. Use markdown code formatting. -->
+
+## Filtering examples
+<!-- Copilot: add 4 concise curl examples for filtering by status, amount range, date range, and combined with pagination -->
+- Status:
+
+```bash
+curl "http://localhost:8000/orders?status=shipped"
+```
+
+- Amount Range:
+```bash
+curl "http://localhost:8000/orders?min_amount=100&max_amount=500"
+```
+- Date Range:
+```bash
+curl "http://localhost:8000/orders?start_date=2024-01-01T00:00:00&end_date=2024-01-31T23:59:59"
+
+- Combined with Pagination:
+```bash
+
+curl "http://localhost:8000/orders?page=2&limit=10&status=paid&min_amount=50&max_amount=300&start_date=2024-01-01T00:00:00&end_date=2024-01-31T23:59:59"
+
+
+---
+
+## Шаг 3 — Copilot-правка №2: добавим 1 edge-case test (без изменения API)
+В `tests/test_orders.py` в самый конец добавь комментарий:
+
+```python
+# Copilot: add an edge-case test that requesting a very large page returns 200 and empty items
+
+def test_list_orders_page_out_of_range_returns_empty(test_app):
+
+
+    client = test_app
+    response = client.get("/orders", params={"page": 1000, "limit": 10})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["items"] == []
+    assert data["page"] == 1000
+    assert data["limit"] == 10
+    
+```
+
+
