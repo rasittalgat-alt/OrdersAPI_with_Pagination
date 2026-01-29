@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import validator
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
 
 ALLOWED_STATUSES = {"pending", "paid", "shipped", "cancelled"}
@@ -34,6 +35,12 @@ class OrderBase(SQLModel):
 
 class Order(OrderBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+
+    __table_args__ = (
+        Index("ix_order_status", "status"),
+        Index("ix_order_amount", "amount"),
+        Index("ix_order_created_at", "created_at"),
+    )
 
 
 class OrderCreate(SQLModel):

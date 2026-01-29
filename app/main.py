@@ -5,10 +5,11 @@ helpers for the Orders Management API.
 """
 
 from datetime import datetime
-from math import ceil
+from math import ceil, isfinite
 from typing import Iterable, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, SQLModel, func, select
 
 from app.db import get_session, init_db
@@ -19,6 +20,8 @@ app = FastAPI(title="Orders Management API")
 DEFAULT_STATUS = "pending"
 DEFAULT_LIMIT = 10
 MAX_LIMIT = 100
+# Prevent extremely large offsets that could cause performance issues
+MAX_PAGE = 10000  # Maximum page number to prevent huge offsets
 
 
 class OrderListResponse(SQLModel):
@@ -84,8 +87,18 @@ def resolve_status(value: Optional[str]) -> str:
 
 
 def validate_amount_range(min_amount: Optional[float], max_amount: Optional[float]) -> None:
-    """Ensure the amount range is not inverted."""
+    """Ensure the amount range is not inverted and values are finite."""
 
+    if min_amount is not None:
+        if not isfinite(min_amount):
+            raise HTTPException(
+                status_code=400, detail="min_amount must be a finite number"
+            )
+    if max_amount is not None:
+        if not isfinite(max_amount):
+            raise HTTPException(
+                status_code=400, detail="max_amount must be a finite number"
+            )
     if min_amount is not None and max_amount is not None and min_amount > max_amount:
         raise HTTPException(status_code=400, detail="min_amount must be <= max_amount")
 
@@ -100,8 +113,10 @@ def validate_date_range(
 
 
 def build_filters(filters: OrderFilters) -> List:
-    """Translate filter inputs into SQLModel conditions."""
-
+    """Translate filter inputs into SQLModel conditions.
+    
+    All comparisons use SQLModel's parameterized queries, preventing SQL injection.
+    """
     clauses = []
     if filters.status:
         clauses.append(Order.status == filters.status)
@@ -139,12 +154,28 @@ def paginate(
 ) -> OrderListResponse:
     """Execute a paginated query and wrap results in a response model."""
 
-    total = session.exec(count_query).one()
+    try:
+        # COUNT queries return a single integer value
+        total = session.exec(count_query).one()
+    except SQLAlchemyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database error occurred while counting records",
+        ) from e
+
     pages = calculate_pages(total, limit)
     offset = (page - 1) * limit
-    items = session.exec(
-        query.order_by(Order.id).offset(offset).limit(limit)
-    ).all()
+
+    try:
+        items = session.exec(
+            query.order_by(Order.id).offset(offset).limit(limit)
+        ).all()
+    except SQLAlchemyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database error occurred while fetching records",
+        ) from e
+
     return OrderListResponse(
         items=[OrderRead.from_orm(order) for order in items],
         page=page,
@@ -216,7 +247,7 @@ def list_orders_logic(
 
 @app.get("/orders", response_model=OrderListResponse)
 def list_orders(
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=MAX_PAGE),
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     status_value: Optional[str] = Query(None, alias="status"),
     min_amount: Optional[float] = Query(None, ge=0),
@@ -234,7 +265,7 @@ def list_orders(
 
 @app.get("/api/orders", response_model=OrderListResponse)
 def list_orders_api(
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=MAX_PAGE),
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     status_value: Optional[str] = Query(None, alias="status"),
     min_amount: Optional[float] = Query(None, ge=0),
