@@ -182,18 +182,17 @@ def create_order(
     return OrderRead.from_orm(order)
 
 
-@app.get("/orders", response_model=OrderListResponse)
-def list_orders(
-    page: int = Query(1, ge=1),
-    limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
-    status_value: Optional[str] = Query(None, alias="status"),
-    min_amount: Optional[float] = Query(None, ge=0),
-    max_amount: Optional[float] = Query(None, ge=0),
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    session: Session = Depends(get_session),
+def list_orders_logic(
+    page: int,
+    limit: int,
+    status_value: Optional[str],
+    min_amount: Optional[float],
+    max_amount: Optional[float],
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+    session: Session,
 ) -> OrderListResponse:
-    """List orders with pagination and optional filtering."""
+    """Core logic for listing orders with pagination and optional filtering."""
 
     filters = OrderFilters(
         status=status_value,
@@ -213,3 +212,39 @@ def list_orders(
     count_query = apply_filters(select(func.count()).select_from(Order), conditions)
 
     return paginate(session, query, count_query, page, limit)
+
+
+@app.get("/orders", response_model=OrderListResponse)
+def list_orders(
+    page: int = Query(1, ge=1),
+    limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    status_value: Optional[str] = Query(None, alias="status"),
+    min_amount: Optional[float] = Query(None, ge=0),
+    max_amount: Optional[float] = Query(None, ge=0),
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    session: Session = Depends(get_session),
+) -> OrderListResponse:
+    """List orders with pagination and optional filtering."""
+
+    return list_orders_logic(
+        page, limit, status_value, min_amount, max_amount, start_date, end_date, session
+    )
+
+
+@app.get("/api/orders", response_model=OrderListResponse)
+def list_orders_api(
+    page: int = Query(1, ge=1),
+    limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    status_value: Optional[str] = Query(None, alias="status"),
+    min_amount: Optional[float] = Query(None, ge=0),
+    max_amount: Optional[float] = Query(None, ge=0),
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    session: Session = Depends(get_session),
+) -> OrderListResponse:
+    """List orders with pagination and optional filtering."""
+
+    return list_orders_logic(
+        page, limit, status_value, min_amount, max_amount, start_date, end_date, session
+    )
