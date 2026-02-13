@@ -72,6 +72,50 @@ curl -X POST http://localhost:8000/orders \
 curl "http://localhost:8000/orders?page=1&limit=5&status=paid&min_amount=50"
 ```
 
+### GET /api/orders
+List orders with pagination and filtering (API version).
+
+**Query parameters**
+- `page` (default 1, minimum 1, maximum 10000)
+- `limit` (default 10, range 1-100)
+- `status` (pending | paid | shipped | cancelled)
+- `min_amount`, `max_amount` (min <= max, must be finite numbers)
+- `start_date`, `end_date` (ISO-8601 datetimes, start <= end)
+
+**Response**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "customer_name": "Ada Lovelace",
+      "amount": 125.50,
+      "status": "paid",
+      "created_at": "2024-01-15T10:30:00"
+    }
+  ],
+  "page": 1,
+  "limit": 10,
+  "total": 25,
+  "pages": 3
+}
+```
+
+**Examples**
+```bash
+# Pagination
+curl "http://localhost:8000/api/orders?page=2&limit=5"
+
+# Filter by status
+curl "http://localhost:8000/api/orders?status=paid&page=1&limit=10"
+
+# Filter by amount range
+curl "http://localhost:8000/api/orders?min_amount=100&max_amount=500"
+
+# Combined filters with pagination
+curl "http://localhost:8000/api/orders?page=1&limit=20&status=shipped&min_amount=50&start_date=2024-01-01T00:00:00"
+```
+
 ## Tests
 ```bash
 pytest
